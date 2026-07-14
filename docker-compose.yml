@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tabungan_umroh_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tabungan_user
+      POSTGRES_PASSWORD: tabungan_pass
+      POSTGRES_DB: tabungan_umroh
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tabungan_user -d tabungan_umroh"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: ./apps/server
+      dockerfile: Dockerfile
+    container_name: tabungan_umroh_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./apps/server/.env
+    environment:
+      DATABASE_URL: postgresql://tabungan_user:tabungan_pass@postgres:5432/tabungan_umroh?schema=public
+
+volumes:
+  postgres_data:

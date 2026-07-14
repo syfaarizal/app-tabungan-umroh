@@ -1,0 +1,21 @@
+{
+  "name": "tabungan-umroh",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "turbo": "^2.1.0"
+  },
+  "packageManager": "pnpm@9.7.0",
+  "dependencies": {
+    "react-native-worklets": "^0.10.2"
+  }
+}

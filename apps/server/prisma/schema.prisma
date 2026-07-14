@@ -1,0 +1,202 @@
+// ============================================================
+// Tabungan Umroh - Prisma Schema
+// PostgreSQL - Normalized schema with soft delete support
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------
+// Enums
+// ------------------------------------------------------------
+
+enum RoleName {
+  ADMIN
+  USER
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+}
+
+enum TransactionStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+enum NotificationType {
+  DEPOSIT_CONFIRMED
+  DEPOSIT_REJECTED
+  TARGET_MILESTONE
+  SYSTEM
+}
+
+// ------------------------------------------------------------
+// Roles
+// ------------------------------------------------------------
+
+model Role {
+  id        String   @id @default(uuid())
+  name      RoleName @unique
+  users     User[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("roles")
+}
+
+// ------------------------------------------------------------
+// Users
+// ------------------------------------------------------------
+
+model User {
+  id           String    @id @default(uuid())
+  fullName     String    @map("full_name")
+  phoneNumber  String    @unique @map("phone_number")
+  email        String?   @unique
+  passwordHash String    @map("password_hash")
+  isActive     Boolean   @default(true) @map("is_active")
+
+  roleId String @map("role_id")
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  savingAccount SavingAccount?
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+
+  recordedTransactions Transaction[] @relation("RecordedByAdmin")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("users")
+}
+
+// ------------------------------------------------------------
+// Saving Accounts (one per user)
+// ------------------------------------------------------------
+
+model SavingAccount {
+  id             String   @id @default(uuid())
+  userId         String   @unique @map("user_id")
+  user           User     @relation(fields: [userId], references: [id])
+  currentBalance Decimal  @default(0) @db.Decimal(14, 2) @map("current_balance")
+  targetAmount   Decimal  @default(0) @db.Decimal(14, 2) @map("target_amount")
+
+  transactions Transaction[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("saving_accounts")
+}
+
+// ------------------------------------------------------------
+// Transactions (deposits / withdrawals)
+// ------------------------------------------------------------
+
+model Transaction {
+  id              String            @id @default(uuid())
+  savingAccountId String            @map("saving_account_id")
+  savingAccount   SavingAccount     @relation(fields: [savingAccountId], references: [id])
+
+  type   TransactionType   @default(DEPOSIT)
+  status TransactionStatus @default(CONFIRMED)
+  amount Decimal           @db.Decimal(14, 2)
+  note   String?
+  transactionDate DateTime @default(now()) @map("transaction_date")
+
+  recordedByAdminId String? @map("recorded_by_admin_id")
+  recordedByAdmin   User?   @relation("RecordedByAdmin", fields: [recordedByAdminId], references: [id])
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([savingAccountId, transactionDate])
+  @@map("transactions")
+}
+
+// ------------------------------------------------------------
+// Refresh Tokens
+// ------------------------------------------------------------
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id])
+  tokenHash String   @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  revoked   Boolean  @default(false)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("refresh_tokens")
+}
+
+// ------------------------------------------------------------
+// Audit Logs
+// ------------------------------------------------------------
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  metadata  Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("audit_logs")
+}
+
+// ------------------------------------------------------------
+// Settings (key-value app configuration)
+// ------------------------------------------------------------
+
+model Setting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("settings")
+}
+
+// ------------------------------------------------------------
+// Notifications
+// ------------------------------------------------------------
+
+model Notification {
+  id      String           @id @default(uuid())
+  userId  String           @map("user_id")
+  user    User             @relation(fields: [userId], references: [id])
+  type    NotificationType @default(SYSTEM)
+  title   String
+  message String
+  isRead  Boolean          @default(false) @map("is_read")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("notifications")
+}

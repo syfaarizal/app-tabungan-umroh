@@ -1,0 +1,14 @@
+node_modules
+dist
+.env
+.env.local
+.env.*.local
+.expo
+*.log
+.DS_Store
+apps/server/dist
+apps/mobile/.expo
+apps/mobile/dist
+.turbo
+coverage
+.next

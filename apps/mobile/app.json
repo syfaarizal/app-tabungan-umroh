@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Tabungan Umroh",
+    "slug": "tabungan-umroh",
+    "scheme": "tabunganumroh",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F0FDF4"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.tabunganumroh.app" },
+    "android": {
+      "package": "com.tabunganumroh.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#059669"
+      }
+    },
+    "plugins": ["expo-router", "expo-secure-store"],
+    "extra": {
+      "apiUrl": "http://192.168.100.42:3000/api/v1"
+    }
+  }
+}
