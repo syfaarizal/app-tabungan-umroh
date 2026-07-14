@@ -12,8 +12,13 @@
       "resizeMode": "contain",
       "backgroundColor": "#F0FDF4"
     },
-    "assetBundlePatterns": ["**/*"],
-    "ios": { "supportsTablet": true, "bundleIdentifier": "com.tabunganumroh.app" },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tabunganumroh.app"
+    },
     "android": {
       "package": "com.tabunganumroh.app",
       "adaptiveIcon": {
@@ -21,9 +26,18 @@
         "backgroundColor": "#059669"
       }
     },
-    "plugins": ["expo-router", "expo-secure-store"],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
     "extra": {
-      "apiUrl": "http://192.168.100.42:3000/api/v1"
+      "apiUrl": "http://192.168.100.42:3000/api/v1",
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "e5285f05-6c4c-40d4-8d29-3e9df5b11daf"
+      }
     }
   }
 }
