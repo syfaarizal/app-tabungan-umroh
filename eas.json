@@ -1,0 +1,20 @@
+{
+  "build": {
+    "preview": {
+      "android": {
+        "buildType": "apk",
+        "env": {
+          "NPM_INSTALL_FLAGS": "--legacy-peer-deps"
+        }
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "aab"
+      }
+    }
+  },
+  "cli": {
+    "version": ">= 21.0.0"
+  }
+}
