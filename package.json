@@ -15,7 +15,5 @@
     "turbo": "^2.1.0"
   },
   "packageManager": "pnpm@9.7.0",
-  "dependencies": {
-    "react-native-worklets": "^0.10.2"
-  }
+  "dependencies": {}
 }
