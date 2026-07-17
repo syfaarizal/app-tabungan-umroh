@@ -31,7 +31,7 @@
       "expo-secure-store"
     ],
     "extra": {
-      "apiUrl": "http://192.168.100.42:3000/api/v1",
+      "apiUrl": "https://app-tabungan-umroh-xxxx.railway.app/api/v1",
       "router": {
         "origin": false
       },
