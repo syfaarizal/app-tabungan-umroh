@@ -28,15 +28,6 @@ export default function UserTabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="setor"
-        options={{
-          title: 'Setor',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="notifikasi"
         options={{
           title: 'Notifikasi',

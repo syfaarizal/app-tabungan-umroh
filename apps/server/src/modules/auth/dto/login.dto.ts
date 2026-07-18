@@ -1,14 +1,15 @@
-import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { RoleName } from '@prisma/client';
 
 export class LoginDto {
   @IsString()
   phoneNumber!: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(6)
-  password!: string;
+  password?: string;
 
   @IsOptional()
-  @IsBoolean()
-  rememberMe?: boolean;
+  @IsEnum(RoleName)
+  role?: RoleName;
 }

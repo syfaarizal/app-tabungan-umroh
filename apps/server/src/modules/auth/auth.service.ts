@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -6,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import { Prisma, RoleName } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 
@@ -18,6 +20,10 @@ export interface AuthTokens {
  * Handles credential verification and token issuance/rotation.
  * Refresh tokens are stored hashed (never plaintext) so a leaked DB dump
  * does not expose usable tokens.
+ *
+ * Login rules:
+ * - USER role: phone number only, no password required
+ * - ADMIN role: phone number + password required
  */
 @Injectable()
 export class AuthService {
@@ -27,33 +33,37 @@ export class AuthService {
     private readonly configService: ConfigService,
   ) {}
 
-  async validateUser(phoneNumber: string, password: string) {
+  async login(dto: LoginDto) {
     const user = await this.prisma.user.findFirst({
-      where: { phoneNumber, deletedAt: null, isActive: true },
+      where: { phoneNumber: dto.phoneNumber, deletedAt: null, isActive: true },
       include: { role: true },
     });
 
     if (!user) {
-      throw new UnauthorizedException('Nomor HP atau password salah');
+      throw new BadRequestException('Nomor HP tidak terdaftar');
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Nomor HP atau password salah');
+    // ADMIN always requires password
+    if (user.role.name === RoleName.ADMIN) {
+      if (!dto.password) {
+        throw new UnauthorizedException('Password wajib diisi untuk admin');
+      }
+      const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
+      if (!isPasswordValid) {
+        throw new UnauthorizedException('Password salah');
+      }
     }
+    // USER role: phone number only, no password check
 
-    return user;
-  }
-
-  async login(dto: LoginDto): Promise<AuthTokens & { user: Record<string, unknown> }> {
-    const user = await this.validateUser(dto.phoneNumber, dto.password);
     const tokens = await this.issueTokens(user.id, user.phoneNumber, user.role.name);
 
     await this.prisma.auditLog.create({
       data: {
         actionType: 'LOGIN',
         performedById: user.id,
-        reason: 'User login',
+        reason: `Login sebagai ${user.role.name}`,
+        oldValue: Prisma.JsonNull,
+        newValue: Prisma.JsonNull,
       },
     });
 

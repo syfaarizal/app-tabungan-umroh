@@ -1,4 +1,3 @@
-import { zodResolver } from '@hookform/resolvers/zod';
 import { AntDesign } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -6,13 +5,13 @@ import { Controller, useForm } from 'react-hook-form';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { ControlledTextField } from '../../src/components/TextField';
 import { Button } from '../../src/components/Button';
-import { TextField } from '../../src/components/TextField';
 import { useAuthStore } from '../../src/store/auth.store';
 
 const schema = z.object({
-  phoneNumber: z.string().min(9, 'Nomor HP tidak valid'),
-  password: z.string().min(6, 'Password minimal 6 karakter'),
+  phoneNumber: z.string().min(9, 'Nomor HP tidak valid').max(15, 'Nomor HP terlalu panjang'),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -22,11 +21,10 @@ export default function LoginScreen() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const {
-    control,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<FormValues>({ resolver: zodResolver(schema) });
+  const { control, handleSubmit, formState: { errors } } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: { phoneNumber: '' },
+  });
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
@@ -34,12 +32,20 @@ export default function LoginScreen() {
     try {
       const user = await login(values);
       if (user.role !== 'USER') {
-        setServerError('Akun ini terdaftar sebagai Admin. Gunakan halaman Login Admin.');
+        setServerError('Akun ini terdaftar sebagai Admin.');
         return;
       }
       router.replace('/(user)/dashboard');
-    } catch {
-      setServerError('Nomor HP atau password salah');
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'response' in err
+          ? ((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? '')
+          : '';
+      if (message.includes('tidak terdaftar')) {
+        setServerError('Nomor HP tidak terdaftar');
+      } else {
+        setServerError('Gagal masuk. Silakan coba lagi.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -47,63 +53,70 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScrollView contentContainerClassName="flex-grow px-6 py-8" keyboardShouldPersistTaps="handled">
-        <View className="items-center mb-8">
-          <View className="w-20 h-20 rounded-2xl bg-primary-100 items-center justify-center mb-4">
-            <Text className="text-4xl">🕌</Text>
+      <ScrollView
+        contentContainerClassName="flex-grow px-6 py-8"
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Header */}
+        <View className="items-center mb-10 mt-4">
+          <View className="w-24 h-24 rounded-3xl bg-primary-100 items-center justify-center mb-5">
+            <Text className="text-5xl">🕌</Text>
           </View>
-          <Text className="text-2xl font-extrabold text-ink">Selamat Datang</Text>
-          <Text className="text-base text-muted mt-1">Masuk untuk melanjutkan</Text>
+          <Text className="text-2xl font-extrabold text-ink">Assalamu&apos;alaikum</Text>
+          <Text className="text-base text-muted mt-2 text-center">
+            Masukkan nomor HP Anda untuk masuk
+          </Text>
         </View>
 
+        {/* Phone Input */}
         <Controller
           control={control}
           name="phoneNumber"
           render={({ field }) => (
-            <TextField
+            <ControlledTextField<FormValues>
               label="Nomor HP"
-              placeholder="08xxxxxxxxxx"
+              control={control}
+              name="phoneNumber"
+              placeholder="Contoh: 081234567890"
               keyboardType="phone-pad"
-              value={field.value}
-              onChangeText={field.onChange}
               error={errors.phoneNumber?.message}
             />
           )}
         />
 
-        <Controller
-          control={control}
-          name="password"
-          render={({ field }) => (
-            <TextField
-              label="Password"
-              placeholder="Masukkan password"
-              secureTextEntry
-              value={field.value}
-              onChangeText={field.onChange}
-              error={errors.password?.message}
-            />
-          )}
-        />
-
+        {/* Server Error */}
         {serverError ? (
-          <Text className="text-danger text-base mb-4 text-center">{serverError}</Text>
+          <View className="bg-danger/10 rounded-card px-4 py-3 mb-4">
+            <Text className="text-danger text-base text-center font-semibold">
+              {serverError}
+            </Text>
+          </View>
         ) : null}
 
-        <Button label="Masuk" onPress={handleSubmit(onSubmit)} loading={isSubmitting} />
+        {/* Submit Button */}
+        <Button
+          label="Masuk"
+          onPress={handleSubmit(onSubmit)}
+          loading={isSubmitting}
+          disabled={isSubmitting}
+        />
 
-        <View className="mt-8 items-center gap-3">
-          <Text className="text-muted text-base">
-            Belum punya akun? <Text className="text-primary-700 font-semibold">Hubungi admin</Text>
+        {/* Help Text */}
+        <View className="mt-10 items-center">
+          <Text className="text-muted text-base text-center">Belum punya akun?</Text>
+          <Text className="text-primary-700 text-base font-semibold mt-1">
+            Hubungi admin untuk mendaftar
           </Text>
-          <Pressable
-            onPress={() => router.push('/(auth)/admin-login')}
-            className="flex-row items-center gap-1 mt-2"
-          >
-            <AntDesign name="lock" size={16} color="#6B7280" />
-            <Text className="text-muted text-base underline">Masuk sebagai Admin</Text>
-          </Pressable>
         </View>
+
+        {/* Admin Link */}
+        <Pressable
+          onPress={() => router.push('/(auth)/admin-login')}
+          className="flex-row items-center justify-center gap-1.5 mt-6"
+        >
+          <AntDesign name="lock" size={15} color="#6B7280" />
+          <Text className="text-muted text-sm underline">Masuk sebagai Admin</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );

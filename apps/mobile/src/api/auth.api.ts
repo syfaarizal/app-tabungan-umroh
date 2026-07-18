@@ -3,8 +3,8 @@ import { AuthUser } from '../types';
 
 export interface LoginPayload {
   phoneNumber: string;
-  password: string;
-  rememberMe?: boolean;
+  password?: string;
+  role?: 'USER' | 'ADMIN';
 }
 
 export interface LoginResponse {
