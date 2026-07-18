@@ -32,6 +32,16 @@ enum TransactionStatus {
   REJECTED
 }
 
+enum AuditActionType {
+  CREATE_USER
+  LOGIN
+  CREATE_TRANSACTION
+  CONFIRM_TRANSACTION
+  REJECT_TRANSACTION
+  DELETE_TRANSACTION
+  MANUAL_ADJUSTMENT
+}
+
 enum NotificationType {
   DEPOSIT_CONFIRMED
   DEPOSIT_REJECTED
@@ -70,7 +80,8 @@ model User {
 
   savingAccount SavingAccount?
   refreshTokens RefreshToken[]
-  auditLogs     AuditLog[]
+  performedAuditLogs AuditLog[] @relation("PerformedByAdmin")
+  targetedAuditLogs AuditLog[] @relation("TargetedUser")
   notifications Notification[]
 
   recordedTransactions Transaction[] @relation("RecordedByAdmin")
@@ -119,6 +130,7 @@ model Transaction {
 
   recordedByAdminId String? @map("recorded_by_admin_id")
   recordedByAdmin   User?   @relation("RecordedByAdmin", fields: [recordedByAdminId], references: [id])
+  auditLogs AuditLog[]
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
@@ -151,16 +163,19 @@ model RefreshToken {
 // ------------------------------------------------------------
 
 model AuditLog {
-  id        String   @id @default(uuid())
-  userId    String?  @map("user_id")
-  user      User?    @relation(fields: [userId], references: [id])
-  action    String
-  entity    String
-  entityId  String?  @map("entity_id")
-  metadata  Json?
-
+  id        String   @id @default(cuid())
+  actionType AuditActionType @map("action_type")
+  performedById String @map("performed_by_id")
+  performedBy   User   @relation("PerformedByAdmin", fields: [performedById], references: [id])
+  targetUserId String? @map("target_user_id")
+  targetUser   User?   @relation("TargetedUser", fields: [targetUserId], references: [id])
+  targetTransactionId String? @map("target_transaction_id")
+  targetTransaction Transaction? @relation(fields: [targetTransactionId], references: [id])
+  amount Decimal? @db.Decimal(14, 2)
+  reason String?
+  oldValue Json? @map("old_value")
+  newValue Json? @map("new_value")
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("audit_logs")
 }

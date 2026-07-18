@@ -76,7 +76,7 @@ export class TransactionsController {
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles(RoleName.ADMIN)
-  remove(@Param('id') id: string) {
-    return this.transactionsService.remove(id);
+  remove(@CurrentUser() admin: AuthenticatedUser, @Param('id') id: string) {
+    return this.transactionsService.remove(id, admin.id);
   }
 }

@@ -13,6 +13,7 @@ import { TransactionsModule } from './modules/transactions/transactions.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ProfileModule } from './modules/profile/profile.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ProfileModule } from './modules/profile/profile.module';
     ReportsModule,
     NotificationsModule,
     ProfileModule,
+    DashboardModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

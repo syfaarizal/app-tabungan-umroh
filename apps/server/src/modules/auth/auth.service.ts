@@ -51,10 +51,9 @@ export class AuthService {
 
     await this.prisma.auditLog.create({
       data: {
-        userId: user.id,
-        action: 'LOGIN',
-        entity: 'User',
-        entityId: user.id,
+        actionType: 'LOGIN',
+        performedById: user.id,
+        reason: 'User login',
       },
     });
 

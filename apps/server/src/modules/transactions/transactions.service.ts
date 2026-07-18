@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { PaginatedResultDto } from '../../common/dto/paginated-result.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -21,26 +22,54 @@ export class TransactionsService {
     });
     if (!account) throw new NotFoundException('Rekening tabungan pengguna tidak ditemukan');
 
-    const { transaction, account: updatedAccount } =
-      await this.transactionsRepository.recordTransaction({
-        savingAccountId: account.id,
-        adminId,
-        amount: dto.amount,
-        type: dto.type ?? 'DEPOSIT',
-        note: dto.note,
-        transactionDate: dto.transactionDate ? new Date(dto.transactionDate) : undefined,
+    const type = dto.type ?? 'DEPOSIT';
+    const balanceChange = type === 'DEPOSIT' ? dto.amount : -dto.amount;
+    const txDate = dto.transactionDate ? new Date(dto.transactionDate) : new Date();
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const transaction = await tx.transaction.create({
+        data: {
+          savingAccountId: account.id,
+          recordedByAdminId: adminId,
+          amount: dto.amount,
+          type,
+          note: dto.note,
+          transactionDate: txDate,
+          status: 'CONFIRMED',
+        },
       });
 
-    await this.prisma.notification.create({
-      data: {
-        userId: dto.userId,
-        type: 'DEPOSIT_CONFIRMED',
-        title: 'Setoran berhasil dicatat',
-        message: `Setoran sebesar Rp${dto.amount.toLocaleString('id-ID')} telah dicatat oleh admin.`,
-      },
+      const updatedAccount = await tx.savingAccount.update({
+        where: { id: account.id },
+        data: { currentBalance: { increment: balanceChange } },
+      });
+
+      await tx.notification.create({
+        data: {
+          userId: dto.userId,
+          type: 'DEPOSIT_CONFIRMED',
+          title: 'Setoran berhasil dicatat',
+          message: `Setoran sebesar Rp${dto.amount.toLocaleString('id-ID')} telah dicatat oleh admin.`,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actionType: 'CREATE_TRANSACTION',
+          performedById: adminId,
+          targetUserId: dto.userId,
+          targetTransactionId: transaction.id,
+          amount: new Prisma.Decimal(dto.amount),
+          reason: 'Direct deposit',
+          oldValue: Prisma.JsonNull,
+          newValue: Prisma.JsonNull,
+        },
+      });
+
+      return { transaction, currentBalance: Number(updatedAccount.currentBalance) };
     });
 
-    return { transaction, currentBalance: Number(updatedAccount.currentBalance) };
+    return result;
   }
 
   /**
@@ -89,24 +118,38 @@ export class TransactionsService {
     });
     if (!account) throw new NotFoundException('Rekening tabungan tidak ditemukan');
 
-    const [transaction] = await this.prisma.$transaction([
-      this.prisma.transaction.update({
-        where: { id },
-        data: { status: 'CONFIRMED', recordedByAdminId: adminId },
-      }),
-      this.prisma.savingAccount.update({
-        where: { id: account.id },
-        data: { currentBalance: { increment: Number(existing.amount) } },
-      }),
-    ]);
-
-    await this.prisma.notification.create({
-      data: {
-        userId: account.userId,
-        type: 'DEPOSIT_CONFIRMED',
-        title: 'Setoran dikonfirmasi',
-        message: `Setoran sebesar Rp${Number(existing.amount).toLocaleString('id-ID')} telah dikonfirmasi.`,
-      },
+    const [transaction] = await this.prisma.$transaction(async (tx) => {
+      const [updated] = await Promise.all([
+        tx.transaction.update({
+          where: { id },
+          data: { status: 'CONFIRMED', recordedByAdminId: adminId },
+        }),
+        tx.savingAccount.update({
+          where: { id: account.id },
+          data: { currentBalance: { increment: Number(existing.amount) } },
+        }),
+        tx.notification.create({
+          data: {
+            userId: account.userId,
+            type: 'DEPOSIT_CONFIRMED',
+            title: 'Setoran dikonfirmasi',
+            message: `Setoran sebesar Rp${Number(existing.amount).toLocaleString('id-ID')} telah dikonfirmasi.`,
+          },
+        }),
+        tx.auditLog.create({
+          data: {
+            actionType: 'CONFIRM_TRANSACTION',
+            performedById: adminId,
+            targetUserId: account.userId,
+            targetTransactionId: id,
+            amount: new Prisma.Decimal(existing.amount),
+            reason: 'Confirmed deposit request',
+            oldValue: { status: existing.status },
+            newValue: { status: 'CONFIRMED' },
+          },
+        }),
+      ]);
+      return [updated];
     });
 
     return transaction;
@@ -123,21 +166,38 @@ export class TransactionsService {
       where: { id: existing.savingAccountId },
     });
 
-    const transaction = await this.transactionsRepository.update(id, {
-      status: 'REJECTED',
-      recordedByAdmin: { connect: { id: adminId } },
-    });
+    const transaction = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.transaction.update({
+        where: { id },
+        data: { status: 'REJECTED', recordedByAdminId: adminId },
+      });
 
-    if (account) {
-      await this.prisma.notification.create({
+      if (account) {
+        await tx.notification.create({
+          data: {
+            userId: account.userId,
+            type: 'DEPOSIT_REJECTED',
+            title: 'Setoran ditolak',
+            message: 'Permintaan setoran Anda ditolak oleh admin. Silakan hubungi admin untuk info lebih lanjut.',
+          },
+        });
+      }
+
+      await tx.auditLog.create({
         data: {
-          userId: account.userId,
-          type: 'DEPOSIT_REJECTED',
-          title: 'Setoran ditolak',
-          message: 'Permintaan setoran Anda ditolak oleh admin. Silakan hubungi admin untuk info lebih lanjut.',
+          actionType: 'REJECT_TRANSACTION',
+          performedById: adminId,
+          targetUserId: account?.userId,
+          targetTransactionId: id,
+          amount: new Prisma.Decimal(existing.amount),
+          reason: 'Rejected deposit request',
+          oldValue: { status: existing.status },
+          newValue: { status: 'REJECTED' },
         },
       });
-    }
+
+      return updated;
+    });
 
     return transaction;
   }
@@ -207,7 +267,7 @@ export class TransactionsService {
     return this.transactionsRepository.findById(id);
   }
 
-  async remove(id: string) {
+  async remove(id: string, performedBy: string) {
     const existing = await this.transactionsRepository.findById(id);
     if (!existing) throw new NotFoundException('Transaksi tidak ditemukan');
     if (existing.deletedAt) throw new ForbiddenException('Transaksi sudah dihapus sebelumnya');
@@ -215,13 +275,26 @@ export class TransactionsService {
     const balanceChange =
       existing.type === 'DEPOSIT' ? -Number(existing.amount) : Number(existing.amount);
 
-    await this.prisma.$transaction([
-      this.prisma.transaction.update({ where: { id }, data: { deletedAt: new Date() } }),
-      this.prisma.savingAccount.update({
-        where: { id: existing.savingAccountId },
-        data: { currentBalance: { increment: balanceChange } },
-      }),
-    ]);
+    await this.prisma.$transaction(async (tx) => {
+      await Promise.all([
+        tx.transaction.update({ where: { id }, data: { deletedAt: new Date() } }),
+        tx.savingAccount.update({
+          where: { id: existing.savingAccountId },
+          data: { currentBalance: { increment: balanceChange } },
+        }),
+        tx.auditLog.create({
+          data: {
+            actionType: 'DELETE_TRANSACTION',
+            performedById: performedBy,
+            targetTransactionId: id,
+            amount: new Prisma.Decimal(existing.amount),
+            reason: 'Transaction deleted',
+            oldValue: { status: existing.status, deletedAt: null },
+            newValue: { status: existing.status, deletedAt: new Date() },
+          },
+        }),
+      ]);
+    });
 
     return { message: 'Transaksi berhasil dihapus' };
   }

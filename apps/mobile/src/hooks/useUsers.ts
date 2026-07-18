@@ -8,7 +8,7 @@ import {
   updateUser,
 } from '../api/users.api';
 
-export function useUsers(params: { page?: number; search?: string } = {}) {
+export function useUsers(params: { page?: number; search?: string; limit?: number } = {}) {
   return useQuery({ queryKey: ['users', params], queryFn: () => getUsers(params) });
 }
 

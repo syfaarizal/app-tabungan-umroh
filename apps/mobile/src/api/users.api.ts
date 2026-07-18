@@ -3,11 +3,12 @@ import { PaginatedResult, UserListItem } from '../types';
 
 export async function getUsers(params: { page?: number; limit?: number; search?: string } = {}) {
   const { data } = await apiClient.get<{ data: PaginatedResult<UserListItem> }>('/users', { params });
-  return data.data;
+  return data.data ?? { data: [], meta: { total: 0, page: 1, limit: 20, totalPages: 0 } };
 }
 
 export async function getUserById(id: string): Promise<UserListItem> {
   const { data } = await apiClient.get(`/users/${id}`);
+  if (!data?.data) throw new Error('User tidak ditemukan');
   return data.data;
 }
 
